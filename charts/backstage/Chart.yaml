@@ -1,5 +1,5 @@
 apiVersion: v2
-name: backstage-gitops
+name: backstage
 description: A Helm chart to deploy RHDH and all dependencies
 type: application
 

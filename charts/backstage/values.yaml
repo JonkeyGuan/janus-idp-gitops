@@ -1,10 +1,333 @@
-backstage:
+#helm repo add openshift-helm-charts https://charts.openshift.io/
+#helm repo update
+#oc project backstage
+#helm install backstage backstage/backstage --values values.yaml
+global:
+  auth:
+    backend:
+      enabled: true
+  clusterRouterBase: apps.hub.jonkey.cc
+  dynamic:
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins:
+      - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-security-insights
+        disabled: false
+      - package: ./dynamic-plugins/dist/immobiliarelabs-backstage-plugin-gitlab-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/immobiliarelabs-backstage-plugin-gitlab
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-gitlab-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-scaffolder-backend-module-gitlab-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes
+        disabled: false
+      - package: ./dynamic-plugins/dist/janus-idp-backstage-plugin-topology
+        disabled: false
+      - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
+        disabled: false
+      - package:  ./dynamic-plugins/dist/janus-idp-backstage-plugin-argocd
+        disabled: false
+      - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd
+        disabled: false
+      - package: ./dynamic-plugins/dist/janus-idp-backstage-plugin-ocm
+        disabled: false
+      - package: ./dynamic-plugins/dist/janus-idp-backstage-plugin-ocm-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-module-utils-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/janus-idp-backstage-plugin-keycloak-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs
+        disabled: false
+      - package: ./dynamic-plugins/dist/janus-idp-backstage-plugin-tekton
+        pluginConfig:
+          dynamicPlugins:
+            frontend:
+              janus-idp.backstage-plugin-tekton:
+                mountPoints:
+                  - mountPoint: entity.page.ci/cards
+                    importName: TektonCI
+                    config:
+                      layout:
+                        gridColumn: "1 / -1"
+                        gridRowStart: 1
+                      if:
+                        allOf:
+                          - isTektonCIAvailable
+        disabled: false
+      - package: ./dynamic-plugins/dist/janus-idp-backstage-plugin-quay
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-tech-radar
+        disabled: false
+
+upstream:
+  backstage:
+    image:
+      registry: quay.io
+      repository: rhdh/rhdh-hub-rhel9
+      tag: '1.2-134'
+      # pullSecrets:
+      # - rhdh-pull-secret
+    extraEnvVars:
+      - name: NODE_OPTIONS
+        value: --no-node-snapshot
+      - name: BACKEND_SECRET
+        value: "{{ randAlphaNum 24 | b64enc }}"
+      - name: 'APP_CONFIG_app_baseUrl'
+        value: 'https://backstage-backstage.apps.hub.jonkey.cc'
+      - name: 'APP_CONFIG_backend_baseUrl'
+        value: 'https://backstage-backstage.apps.hub.jonkey.cc'
+      - name: 'APP_CONFIG_backend_cors_origin'
+        value: 'https://backstage-backstage.apps.hub.jonkey.cc'
+      - name: POSTGRES_ADMIN_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            key: postgres-password
+            name: backstage-postgresql
+      - name: NODE_TLS_REJECT_UNAUTHORIZED
+        value: "0"
+      - name: APP_CONFIG_catalog_providers_keycloakOrg_default_baseUrl
+        value: https://keycloak-backstage.apps.hub.jonkey.cc/auth
+      - name: APP_CONFIG_catalog_providers_keycloakOrg_default_loginRealm
+        value: backstage
+      - name: APP_CONFIG_catalog_providers_keycloakOrg_default_realm
+        value: backstage
+      - name: APP_CONFIG_catalog_providers_keycloakOrg_default_clientId
+        valueFrom:
+          secretKeyRef:
+            key: CLIENT_ID
+            name: keycloak-client-secret-backstage
+      - name: APP_CONFIG_catalog_providers_keycloakOrg_default_clientSecret
+        valueFrom:
+          secretKeyRef:
+            key: CLIENT_SECRET
+            name: keycloak-client-secret-backstage
+      - name: LOG_LEVEL
+        value: debug      
+
+    appConfig:
+      backend:
+        listen:
+          port: 7007
+          host: 0.0.0.0
+        csp:
+          connect-src: ["'self'", 'http:', 'https:']
+        cors:
+          origin: https://backstage-backstage.apps.hub.jonkey.cc
+          methods: [GET, POST, PUT, DELETE]
+          credentials: true
+        database:
+          client: pg
+          connection:
+            host: "${POSTGRES_HOST}"
+            port: "${POSTGRES_PORT}"
+            user: "${POSTGRES_USER}"
+            password: "${POSTGRES_ADMIN_PASSWORD}"
+        reading:
+          allow:
+            - host: '*.apps.hub.jonkey.cc'
+
+      integrations:
+        gitlab:
+        - host: gitlab-gitlab.apps.hub.jonkey.cc
+          baseUrl: https://gitlab-gitlab.apps.hub.jonkey.cc
+          apiBaseUrl: https://gitlab-gitlab.apps.hub.jonkey.cc/api/v4
+          token: glpat-k-yVsZCuv-TNVYf_hQCE
+
+      proxy:
+        endpoints:
+          '/quay/api':
+            target: 'https://quay.apps.hub.jonkey.cc'
+            headers:
+              X-Requested-With: 'XMLHttpRequest'
+              # Uncomment the following line to access a private Quay Repository using a token
+              Authorization: 'Bearer PM3GHLIP1CH90OJBYWID3EPAJP4Z0AHTJEVDO9ZR'
+            changeOrigin: true
+            # Change to "false" in case of using self hosted quay instance with a self-signed certificate
+            secure: false
+          '/developer-hub':
+            target: https://gitlab-gitlab.apps.hub.jonkey.cc/
+            pathRewrite:
+              '^/api/proxy/developer-hub/tech-radar': /gitops/janus-idp-gitops/-/raw/main/config/tech-radar.json
+            changeOrigin: true
+            secure: false
+
+      quay:
+        # The UI url for Quay, used to generate the link to Quay
+        uiUrl: 'https://quay.apps.hub.jonkey.cc'
+
+      gitlab:
+        proxySecure: false
+
+      techdocs:
+        builder: 'external'
+        generator:
+          runIn: 'local'
+        publisher:
+          type: 'awsS3'
+          awsS3:
+            bucketName: backstage-bucket-claim-e3156dca-e359-42d1-840b-b03d70781992
+            region: us-east-2
+            endpoint: https://s3-openshift-storage.apps.hub.jonkey.cc
+            s3ForcePathStyle: true
+            credentials:
+              accessKeyId: fhk5bE9NOjqLsMrudoKj
+              secretAccessKey: +zX3nbxOuyhlckvXg+IfiZIE6rH4iUyEC2hR9eMQ
+
+      auth:
+        environment: production
+        session:       
+          secret: "{{ randAlpha 32 | lower | b64enc }}"
+        providers:
+          oidc:
+            production:
+              metadataUrl: https://keycloak-backstage.apps.hub.jonkey.cc/auth/realms/backstage
+              clientId: "${APP_CONFIG_catalog_providers_keycloakOrg_default_clientId}"
+              clientSecret: "${APP_CONFIG_catalog_providers_keycloakOrg_default_clientSecret}"
+              # scope: openid profile email
+              prompt: auto
+              # callbackUrl: https://backstage-backstage.apps.hub.jonkey.cc/api/auth/oidc/handler/frame
+              # signIn:
+              #   resolvers:
+              #     - resolver: preferredUsernameMatchingUserEntityName
+
+      signInPage: oidc
+
+      scaffolder:
+        # see https://backstage.io/docs/features/software-templates/configuration for software template options
+
+      catalog:
+        rules:
+          - allow: [Component, System, API, Resource, Location, Template]
+        locations:
+          - target: https://gitlab-gitlab.apps.hub.jonkey.cc/rhdh/software-templates/blob/main/showcase-templates.yaml
+            type: url
+            rules:
+              - allow: [Template]
+          - target: https://gitlab-gitlab.apps.hub.jonkey.cc/rhdh/software-templates/blob/main/org.yaml
+            type: url
+            rules:
+              - allow: [Group, User]
+          - target: https://gitlab-gitlab.apps.hub.jonkey.cc/rhdh/backstage-workshop/blob/master/showcase-templates.yaml
+            type: url
+            rules:
+              - allow: [Template]
+        providers:
+          gitlab:
+            selfHosted:
+              host: gitlab-gitlab.apps.hub.jonkey.cc
+              schedule: # optional; same options as in TaskScheduleDefinition
+                # supports cron, ISO duration, "human duration" as used in code
+                frequency: { seconds: 10 }
+                # supports ISO duration, "human duration" as used in code
+                timeout: { seconds: 60 }
+          ocm:
+            default:
+              name: multiclusterhub
+              kubernetesPluginRef: hub-cluster-infra
+              schedule: # optional; same options as in TaskScheduleDefinition
+                # supports cron, ISO duration, "human duration" as used in code
+                frequency: { seconds: 10 }
+                # supports ISO duration, "human duration" as used in code
+                timeout: { seconds: 60 }
+              owner: group:rhdh
+
+      argocd:
+        appLocatorMethods:
+          - type: 'config'
+            instances:
+              - name: main
+                url:  https://openshift-gitops-server-openshift-gitops.apps.hub.jonkey.cc
+                username: admin
+                password: openshift
+
+      kubernetes:
+        serviceLocatorMethod:
+          type: "multiTenant"
+        clusterLocatorMethods:
+          - type: "config"
+            clusters:
+              - name: hub-cluster-infra
+                url: https://api.hub.jonkey.cc:6443
+                authProvider: "serviceAccount"
+                skipTLSVerify: true
+                serviceAccountToken: eyJhbGciOiJSUzI1NiIsImtpZCI6IlB4Q2Zmc016ajhvYjhpYmR5bnhrUFRvMjRUYmtiQlQ0eVQyYjZPYWhGd2MifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImJhY2tzdGFnZS10b2tlbiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJiYWNrc3RhZ2UiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIzZmE0ZjYzYS02YjI1LTRmZWItODBmZS00NjIzNDI3OWJlOWQiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGVmYXVsdDpiYWNrc3RhZ2UifQ.42nY989N757BLL7vu1_-8j0yoRYtxdEOTJE_ZBWufuyhpWnxyc9kQO5mFoYvBXJ_fwP90lMykBpLFBnltpBSlsVk53JfZGfC8vzEz42Me1Gu_4pKwzTy6hf0GAXenbFQhwg_7r-dOXatqEsbCnpjR0_DdxyISc1EuEHxVInXWXkFBXUtWM7ZkgnYeo86lB5Qn2gqyFZ2u791KG16_E7aN8jex0juSpPV_nnskMdpsq2VmbKUaTeKUcONL3Y22LmxOksK7tPNI4TyE54B09yHP9zw4VBajDYMgMvwnAjLf52gXIODexoObLovgS3VYdgE-hDPJQQ2VSKcDkw85txGoskKQIiRftKOIqT6lo7e_dYZWKq0xhj-NDO-Hyqm3kBrhNMs0AfwR5cfwz2RkuOlyAWfcBp3d_00xsnvAtbf4bB7uz9ScHDhsU4JDupxOR7l6pU-XflmAsDKFBQr9xrxJV2uwt3tYTv4T5OX-8rQGALHL6JK39XCj_f4mR3WmX0W0GeM3K_9dkyjaQz5EaF_D2PO41d8jIPv0MjwcqCKBoFFxu4jDki2izemrimCvoWufNUXiDKsvtEIIPBliL9MYAfbsJ1Aj_EMbSmF44Cg7_1jAziEs8HUN0By_61BV4HxoBpcdVK9KQ_gM5An7teLCLk4uqhpKZqmsQoxKSAjXaI
+        customResources:
+          - group: 'tekton.dev'
+            apiVersion: 'v1beta1'
+            plural: 'pipelineruns'
+          - group: 'tekton.dev'
+            apiVersion: 'v1beta1'
+            plural: 'taskruns'
+          - group: 'route.openshift.io'
+            apiVersion: 'v1'
+            plural: 'routes'
+
+      permission:
+        enabled: false
+
+      enabled:
+        kubernetes: true
+        techdocs: true
+        argocd: true
+        sonarqube: false
+        keycloak: true
+        ocm: true
+        github: false
+        githubOrg: false
+        gitlab: true
+        jenkins: false
+        permission: false
+
   postgresql:
-    password: password
-  image:
-    pullSecret: ''
-  app:
-    repoURL: https://janus-idp.github.io/helm-backstage
-    chart: backstage
-    valueFile: https://gitlab-gitlab.apps.cluster-5bkcl.sandbox3056.opentlc.com/development/test-helm/-/raw/main/backstage-values.yaml
-    targetRevision: 2.10.3
+    enabled: true
+    database: backstage
+    postgresqlDataDir: /var/lib/pgsql/data/userdata
+    auth:
+      username: postgres
+      database: backstage
+      existingSecret: backstage-postgresql
+      secretKeys:
+        userPasswordKey: postgres-password
+    image:
+      registry: registry.redhat.io
+      repository: rhel9/postgresql-13
+      tag: 1-73
+    primary:
+      securityContext:
+        enabled: false
+      podSecurityContext:
+        enabled: false
+      containerSecurityContext:
+        enabled: false
+      persistence:
+        enabled: true
+        mountPath: /var/lib/pgsql/data
+      extraEnvVars:
+        - name: POSTGRESQL_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: postgres-password
+              name: backstage-postgresql
+  service:
+    ports:
+      name: http-backend
+      backend: 7007
+      targetPort: backend
+
+route:
+  enabled: true
+  host: backstage-backstage.apps.hub.jonkey.cc
+  tls:
+    enabled: true
+    termination: "edge"
+
+

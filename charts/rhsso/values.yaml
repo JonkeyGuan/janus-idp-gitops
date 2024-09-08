@@ -4,17 +4,17 @@ subscription:
   name: rhsso-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
-  startingCSV: rhsso-operator.7.6.4-opr-002
+  startingCSV: rhsso-operator.7.6.9-opr-002
 realm:
   identityProviders:
     - alias: Gitlab
       providerId: oidc
-      clientId: 8e1ce491b3aa6009b5ad560ee6af484bf0a0c9dea0a899dc31660fdc147eb5bb
-      tokenUrl: https://gitlab-gitlab.apps.cluster-ctmxg.ctmxg.sandbox430.opentlc.com/oauth/token
-      authorizationUrl: https://gitlab-gitlab.apps.cluster-ctmxg.ctmxg.sandbox430.opentlc.com/oauth/authorize
+      clientId: bf6e3bc4ac5cf8eb5be6d70401d511b7a3518061b863d928ce6454e6c2457113
+      tokenUrl: https://gitlab-gitlab.apps.hub.jonkey.cc/oauth/token
+      authorizationUrl: https://gitlab-gitlab.apps.hub.jonkey.cc/oauth/authorize
       clientAuthMethod: client_secret_basic
       syncMode: IMPORT
-      clientSecret: "70c338be23d67a9c992234bc07cb922c2302f2d8a5d24b97e9aa9019517bccb9"
+      clientSecret: "f87f03a64d839d4d9dd66bd3c902ba6211f410a2950269a5804ac7960fdf4e33"
 client:
   redirectUri:
-  - https://backstage-backstage.apps.cluster-ctmxg.ctmxg.sandbox430.opentlc.com/oauth2/callback
+  - https://backstage-backstage.apps.hub.jonkey.cc/api/auth/oidc/handler/frame
